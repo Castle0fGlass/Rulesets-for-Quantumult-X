@@ -2,7 +2,7 @@ name: Weekly ACL Rules Sync
 
 on:
   schedule:
-    - cron: '0 2 * * 1'
+    - cron: '0 0 * * 1'
   workflow_dispatch:
 
 jobs:
@@ -38,7 +38,7 @@ jobs:
             read -r url filename policy <<< "$entry"
             wget -O input.yaml "$url"
 
-            ./subconverter/subconverter -g -i input.yaml -o qx_output.conf -f quantumult
+            ./subconverter/subconverter-linux-amd64 -g -i input.yaml -o qx_output.conf -f quantumult
 
             sed "/^HOST\|DOMAIN/s/,.*,/,${policy,,}/" qx_output.conf > output/$filename
           done
