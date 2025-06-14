@@ -1,80 +1,72 @@
-name: Weekly ACL Rules Sync
+name: Sync ACL4SSR Rules for Quantumult X # 工作流名称
+
 on:
   schedule:
-    - cron: '0 2 * * 1'   # 每周一凌晨2点自动跑
-  workflow_dispatch:       # 支持手动触发
+    - cron: '0 0 * * 1' # 每周一00:00 UTC执行，请注意GitHub Actions的cron时间是UTC时间
 
 jobs:
-  update-rules:
-    runs-on: ubuntu-latest
-
+  sync-rules:
+    runs-on: ubuntu-latest # 在最新的Ubuntu环境下运行此作业
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
+      - name: 检查仓库代码 # 步骤名称：拉取当前仓库代码
+        uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: 配置Git用户信息 # 步骤名称：配置Git提交的用户信息
         run: |
-          sudo apt-get update
-          sudo apt-get install -y wget tar
-          wget https://github.com/tindy2013/subconverter/releases/latest/download/subconverter_linux64.tar.gz
-          tar -xzf subconverter_linux64.tar.gz
-          chmod +x subconverter/subconverter
+          git config user.name "GitHub Actions" # 设置Git提交用户名
+          git config user.email "actions@github.com" # 设置Git提交用户邮箱
 
-      - name: Download and convert rules
-        id: download-and-convert
+      - name: 获取并转换规则 # 步骤名称：下载、处理并转换规则文件
         run: |
-          set -e
-          mkdir -p output
-          RULES=(
-            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/LocalAreaNetwork.yaml LAN.snippet DIRECT"
-            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/BanAD.yaml BlockAdAlliance.snippet REJECT"
-            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/BanProgramAD.yaml BlockAds.snippet REJECT"
-            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/ChinaDomain.yaml ChinaDomain.snippet DIRECT"
-            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/Apple.yaml Apple.snippet DIRECT"
-            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/Ruleset/Microsoft.yaml Microsoft.snippet DIRECT"
-            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/ProxyLite.yaml ProxyLite.snippet PROXY"
+          # 定义规则源URL、对应的Quantumult X策略以及输出文件名
+          # 格式为：["URL"]="策略:文件名"
+          declare -A urls=(
+            ["https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/refs/heads/master/Clash/Providers/LocalAreaNetwork.yaml"]="DIRECT:LAN.snippet"
+            ["https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/refs/heads/master/Clash/Providers/BanAD.yaml"]="REJECT:BlockAdAlliance.snippet"
+            ["https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/refs/heads/master/Clash/Providers/BanProgramAD.yaml"]="REJECT:BlockAds.snippet"
+            ["https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/refs/heads/master/Clash/Providers/ChinaDomain.yaml"]="DIRECT:ChinaDomain.snippet"
+            ["https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/refs/heads/master/Clash/Providers/Apple.yaml"]="DIRECT:Apple.snippet"
+            ["https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/refs/heads/master/Clash/Providers/Ruleset/Microsoft.yaml"]="DIRECT:Microsoft.snippet"
+            ["https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/refs/heads/master/Clash/Providers/ProxyLite.yaml"]="PROXY:ProxyLite.snippet"
           )
-          any_snippet_generated=false
 
-          for entry in "${RULES[@]}"; do
-            read -r url filename policy <<< "$entry"
-            echo "Downloading $url ..."
-            wget -q -O input.yaml "$url"
-            if [ ! -s input.yaml ]; then
-              echo "Failed to download $url or file is empty"
-              exit 1
-            fi
+          # 遍历所有定义的URL进行处理
+          for url in "${!urls[@]}"; do
+            # 从关联数组中解析策略和文件名
+            IFS=':' read -r policy filename <<< "${urls[$url]}"
+            echo "正在处理：$url，策略：$policy，输出文件：$filename"
 
-            ./subconverter/subconverter -g -i input.yaml -o output/qx_output.conf -f quantumult
+            # 使用curl下载文件，然后通过grep和sed进行格式转换
+            curl -s "$url" | \
+            # 使用grep过滤出有效的规则行（以'- '开头，并包含常见的规则类型）
+            grep -E '^\s*-\s*(DOMAIN-SUFFIX|HOST|IP-CIDR|IP6-CIDR|GEOIP|PROCESS|RULE-SET|FINAL)' | \
+            sed -E "
+              s/^\s*-\s*//; # 移除行首的YAML列表标记 '- '
 
-            if [ -f output/qx_output.conf ]; then
-              # 替换策略字段，注意转小写
-              sed "/^HOST\|DOMAIN/s/,.*,/,${policy,,}/" output/qx_output.conf > output/$filename
-              echo "Generated snippet: output/$filename"
-              any_snippet_generated=true
-            else
-              echo "subconverter output missing for $filename"
-            fi
+              # 特殊转换：将'DOMAIN-SUFFIX,ip6-localhost'精确转换为'HOST-SUFFIX,ip6-localhost,direct'
+              # 这一规则需要放在通用DOMAIN-SUFFIX转换之前，以确保其优先匹配
+              s/^DOMAIN-SUFFIX,ip6-localhost$/HOST-SUFFIX,ip6-localhost,direct/;
+
+              s/^DOMAIN-SUFFIX,/HOST-SUFFIX,/g; # 将所有'DOMAIN-SUFFIX,'转换为'HOST-SUFFIX,'
+              s/^HOST,/HOST-SUFFIX,/g; # 将所有'HOST,'转换为'HOST-SUFFIX,' (如果Clash规则中包含HOST类型)
+
+              # 为IP-CIDR和IP6-CIDR规则添加策略和',no-resolve'
+              # (IP-CIDR,0.0.0.0/8 -> IP-CIDR,0.0.0.0/8,DIRECT,no-resolve)
+              /^(IP-CIDR|IP6-CIDR),/ s/$/,${policy},no-resolve/;
+
+              # 为其他通用规则类型（如HOST-SUFFIX, GEOIP等）添加策略
+              # 这条规则会在前面的转换完成后，为所有匹配的规则追加策略
+              /^(HOST-SUFFIX|GEOIP|PROCESS|RULE-SET|FINAL),/ s/$/,${policy}/;
+            " > "$filename" # 将转换后的内容保存到指定文件
+            echo "已生成 $filename" # 输出生成成功信息
           done
 
-          echo "has_snippet=$any_snippet_generated" >> $GITHUB_OUTPUT
-
-      - name: Show generated files
+      - name: 提交并推送更改 (如果存在) # 步骤名称：提交更改到仓库
         run: |
-          ls -l output/
-          cat output/*.snippet || echo "No snippet files found"
-
-      - name: Commit and push changes
-        if: steps.download-and-convert.outputs.has_snippet == 'true'
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git add output/*.snippet
-
-          # 只有有变更时才commit
-          if ! git diff --cached --quiet; then
-            git commit -m "Weekly update: sync ACL rules for QuantumultX"
-            git push
-          else
-            echo "No changes to commit."
-          fi
+          git add *.snippet # 将所有生成的.snippet文件添加到Git暂存区
+          # 检查暂存区是否有实际的更改（与上次提交不同），如果有则进行提交和推送
+          # '--quiet' 参数使git diff在有差异时不输出具体内容，只返回状态码
+          git diff --staged --quiet || (git commit -m "Auto-sync ACL4SSR rules for Quantumult X" && git push)
+        env:
+          # GITHUB_TOKEN是一个由GitHub Actions自动提供的令牌，用于认证对当前仓库的读写权限
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
