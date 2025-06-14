@@ -1,13 +1,14 @@
 name: Sync ACL4SSR Rules for Quantumult X # 工作流名称
 
 on:
-  workflow_dispatch:
   schedule:
-    - cron: '0 0 * * 1' # 每周一00:00 UTC执行
+    - cron: '0 0 * * 1' # 每周一00:00 UTC执行，请注意GitHub Actions的cron时间是UTC时间
 
 jobs:
   sync-rules:
     runs-on: ubuntu-latest # 在最新的Ubuntu环境下运行此作业
+    permissions: # 明确配置此作业的权限
+      contents: write # 授予对仓库内容的写入权限，这是提交和推送所必需的
     steps:
       - name: 检查仓库代码 # 步骤名称：拉取当前仓库代码
         uses: actions/checkout@v4
