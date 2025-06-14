@@ -2,7 +2,7 @@ name: Weekly ACL Rules Sync
 
 on:
   schedule:
-    - cron: '0 2 * * 1'  # 每周一 UTC 时间 2 点（北京时间 10 点）
+    - cron: '0 2 * * 1'
   workflow_dispatch:
 
 jobs:
@@ -16,9 +16,10 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y wget unzip
-          wget https://github.com/tindy2013/subconverter/releases/latest/download/subconverter_linux64.zip
-          unzip subconverter_linux64.zip -d subconverter
+          sudo apt-get install -y wget tar
+          wget https://github.com/tindy2013/subconverter/releases/latest/download/subconverter_linux64.tar.gz
+          mkdir -p subconverter
+          tar -xzf subconverter_linux64.tar.gz -C subconverter
 
       - name: Download and convert rules
         run: |
@@ -39,7 +40,6 @@ jobs:
 
             ./subconverter/subconverter -g -i input.yaml -o qx_output.conf -f quantumult
 
-            # 替换策略关键词
             sed "/^HOST\|DOMAIN/s/,.*,/,${policy,,}/" qx_output.conf > output/$filename
           done
 
