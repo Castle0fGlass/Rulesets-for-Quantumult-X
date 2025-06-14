@@ -34,6 +34,8 @@ jobs:
             "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/ProxyLite.yaml ProxyLite.snippet PROXY" \
           )
 
+          any_snippet_generated=false
+
           for entry in "${RULES[@]}"; do
             read -r url filename policy <<< "$entry"
             wget -O input.yaml "$url"
@@ -42,10 +44,14 @@ jobs:
 
             if [ -f output/qx_output.conf ]; then
               sed "/^HOST\|DOMAIN/s/,.*,/,${policy,,}/" output/qx_output.conf > output/$filename
+              any_snippet_generated=true
             fi
           done
 
+          echo "::set-output name=has_snippet::$any_snippet_generated"
+
       - name: Commit and push
+        if: steps.download-and-convert.outputs.has_snippet == 'true'
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
