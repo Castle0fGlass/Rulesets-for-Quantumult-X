@@ -1,80 +1,52 @@
-name: Update Quantumult X Rules
+name: Weekly ACL Rules Sync
 
 on:
-  workflow_dispatch:
   schedule:
-    - cron: '0 0 * * 1' 
+    - cron: '0 2 * * 1'  # 每周一 UTC 时间 2 点（北京时间 10 点）
+  workflow_dispatch:
 
 jobs:
   update-rules:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v3
 
-      - name: Install Subconverter
+      - name: Install dependencies
         run: |
-          SUB_VERSION="v0.9.0"
-          
-          echo "Downloading subconverter version ${SUB_VERSION}..."
-          wget "https://github.com/tindy2013/subconverter/releases/download/${SUB_VERSION}/subconverter-linux-amd64.tar.gz" -O subconverter.tar.gz
-          
-          echo "Extracting subconverter..."
-          tar -xzf subconverter.tar.gz
-          
-          if [ -f "subconverter-linux-amd64/subconverter" ]; then
-            echo "Found subconverter in subfolder, moving it..."
-            mv subconverter-linux-amd64/subconverter .
-            rm -rf subconverter-linux-amd64 # 清理空文件夹
-          elif [ ! -f "subconverter" ]; then
-            echo "Error: subconverter executable not found in current directory after extraction."
-            ls -R
-            exit 1
-          fi
+          sudo apt-get update
+          sudo apt-get install -y wget unzip
+          wget https://github.com/tindy2013/subconverter/releases/latest/download/subconverter_linux64.zip
+          unzip subconverter_linux64.zip -d subconverter
 
-          echo "Granting execute permission to subconverter..."
-          chmod +x subconverter
-          
-          # 将 subconverter 可执行文件移动到 PATH 中，以便在后续步骤中直接调用
-          echo "Moving subconverter to /usr/local/bin..."
-          sudo mv subconverter /usr/local/bin/
-          
-          echo "subconverter setup complete and moved to /usr/local/bin."
-
-      - name: Process and update LAN.snippet
+      - name: Download and convert rules
         run: |
-          # 由于 subconverter 已在 PATH 中，可以直接调用
-          curl -sS "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/refs/heads/master/Clash/Providers/LocalAreaNetwork.yaml" | subconverter -t quantumultx -n DIRECT > LAN.snippet
+          mkdir -p output
+          RULES=(\
+            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/LocalAreaNetwork.yaml LAN.snippet DIRECT" \
+            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/BanAD.yaml BlockAdAlliance.snippet REJECT" \
+            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/BanProgramAD.yaml BlockAds.snippet REJECT" \
+            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/ChinaDomain.yaml ChinaDomain.snippet DIRECT" \
+            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/Apple.yaml Apple.snippet DIRECT" \
+            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/Ruleset/Microsoft.yaml Microsoft.snippet DIRECT" \
+            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/ProxyLite.yaml ProxyLite.snippet PROXY" \
+          )
 
-      - name: Process and update BlockAdAlliance.snippet
-        run: |
-          curl -sS "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/refs/heads/master/Clash/Providers/BanAD.yaml" | subconverter -t quantumultx -n REJECT > BlockAdAlliance.snippet
+          for entry in "${RULES[@]}"; do
+            read -r url filename policy <<< "$entry"
+            wget -O input.yaml "$url"
 
-      - name: Process and update BlockAds.snippet
-        run: |
-          curl -sS "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/refs/heads/master/Clash/Providers/BanProgramAD.yaml" | subconverter -t quantumultx -n REJECT > BlockAds.snippet
+            ./subconverter/subconverter -g -i input.yaml -o qx_output.conf -f quantumult
 
-      - name: Process and update ChinaDomain.snippet
-        run: |
-          curl -sS "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/refs/heads/master/Clash/Providers/ChinaDomain.yaml" | subconverter -t quantumultx -n DIRECT > ChinaDomain.snippet
+            # 替换策略关键词
+            sed "/^HOST\|DOMAIN/s/,.*,/,${policy,,}/" qx_output.conf > output/$filename
+          done
 
-      - name: Process and update Apple.snippet
+      - name: Commit and push
         run: |
-          curl -sS "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/refs/heads/master/Clash/Providers/Apple.yaml" | subconverter -t quantumultx -n DIRECT > Apple.snippet
-
-      - name: Process and update Microsoft.snippet
-        run: |
-          curl -sS "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/refs/heads/master/Clash/Providers/Ruleset/Microsoft.yaml" | subconverter -t quantumultx -n DIRECT > Microsoft.snippet
-
-      - name: Process and update ProxyLite.snippet
-        run: |
-          curl -sS "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/refs/heads/master/Clash/Providers/ProxyLite.yaml" | subconverter -t quantumultx -n PROXY > ProxyLite.snippet
-
-      - name: Commit and push changes
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git add *.snippet
-          git commit -m "自动更新 Quantumult X 规则" || echo "没有新的规则更新，跳过提交"
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add output/*.snippet
+          git commit -m "Weekly update: sync ACL rules for QuantumultX"
           git push
