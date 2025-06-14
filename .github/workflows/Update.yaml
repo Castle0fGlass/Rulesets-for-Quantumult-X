@@ -45,6 +45,7 @@ jobs:
             grep -E '^\s*-\s*(DOMAIN-SUFFIX|HOST|IP-CIDR|IP6-CIDR|GEOIP|PROCESS|RULE-SET|FINAL)' | \
             sed -E "
               s/^\s*-\s*//; # 移除行首的YAML列表标记 '- '
+              s/acl4.ssr//g; # 删除所有 'acl4.ssr' 标记，无论它出现在行的哪个位置
 
               # 清理行尾可能存在的Quantumult X相关后缀或策略，避免重复添加或格式错误
               s/,(no-)?resolve$//; # 首先移除 Quantumult X 特有的 ,no-resolve 或 ,resolve
