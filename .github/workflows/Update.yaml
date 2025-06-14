@@ -55,14 +55,9 @@ jobs:
               # 例如 'DOMAIN-SUFFIX' 或 'HOST,' 这样的无效行
               /^((DOMAIN-SUFFIX|HOST|IP-CIDR|IP6-CIDR|GEOIP|PROCESS|RULE-SET|FINAL),?)$|^$/d;
 
-
               # 清理行尾可能存在的Quantumult X相关后缀或策略，避免重复添加或格式错误
               s/,(no-)?resolve$//; # 首先移除 Quantumult X 特有的 ,no-resolve 或 ,resolve
               s/,(DIRECT|REJECT|PROXY)$//; # 其次移除可能存在的策略（如DIRECT, REJECT, PROXY），确保策略是唯一的且位于正确位置
-
-              # 特殊转换：将'DOMAIN-SUFFIX,ip6-localhost'精确转换为'HOST-SUFFIX,ip6-localhost,direct'
-              # 这一规则需要放在通用DOMAIN-SUFFIX转换之前，以确保其优先匹配
-              s/^DOMAIN-SUFFIX,ip6-localhost$/HOST-SUFFIX,ip6-localhost,direct/;
 
               # 将Clash的DOMAIN-SUFFIX和HOST类型转换为Quantumult X的HOST-SUFFIX类型
               s/^DOMAIN-SUFFIX,/HOST-SUFFIX,/g;
