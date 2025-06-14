@@ -1,9 +1,8 @@
 name: Weekly ACL Rules Sync
-
 on:
   schedule:
-    - cron: '0 2 * * 1'
-  workflow_dispatch:
+    - cron: '0 2 * * 1'   # 每周一凌晨2点自动跑
+  workflow_dispatch:       # 支持手动触发
 
 jobs:
   update-rules:
@@ -22,39 +21,60 @@ jobs:
           chmod +x subconverter/subconverter
 
       - name: Download and convert rules
+        id: download-and-convert
         run: |
+          set -e
           mkdir -p output
-          RULES=(\
-            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/LocalAreaNetwork.yaml LAN.snippet DIRECT" \
-            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/BanAD.yaml BlockAdAlliance.snippet REJECT" \
-            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/BanProgramAD.yaml BlockAds.snippet REJECT" \
-            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/ChinaDomain.yaml ChinaDomain.snippet DIRECT" \
-            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/Apple.yaml Apple.snippet DIRECT" \
-            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/Ruleset/Microsoft.yaml Microsoft.snippet DIRECT" \
-            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/ProxyLite.yaml ProxyLite.snippet PROXY" \
+          RULES=(
+            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/LocalAreaNetwork.yaml LAN.snippet DIRECT"
+            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/BanAD.yaml BlockAdAlliance.snippet REJECT"
+            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/BanProgramAD.yaml BlockAds.snippet REJECT"
+            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/ChinaDomain.yaml ChinaDomain.snippet DIRECT"
+            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/Apple.yaml Apple.snippet DIRECT"
+            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/Ruleset/Microsoft.yaml Microsoft.snippet DIRECT"
+            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/ProxyLite.yaml ProxyLite.snippet PROXY"
           )
-
           any_snippet_generated=false
 
           for entry in "${RULES[@]}"; do
             read -r url filename policy <<< "$entry"
-            wget -O input.yaml "$url"
+            echo "Downloading $url ..."
+            wget -q -O input.yaml "$url"
+            if [ ! -s input.yaml ]; then
+              echo "Failed to download $url or file is empty"
+              exit 1
+            fi
 
             ./subconverter/subconverter -g -i input.yaml -o output/qx_output.conf -f quantumult
 
             if [ -f output/qx_output.conf ]; then
+              # 替换策略字段，注意转小写
               sed "/^HOST\|DOMAIN/s/,.*,/,${policy,,}/" output/qx_output.conf > output/$filename
+              echo "Generated snippet: output/$filename"
               any_snippet_generated=true
+            else
+              echo "subconverter output missing for $filename"
             fi
           done
 
-          echo "::set-output name=has_snippet::$any_snippet_generated"
+          echo "has_snippet=$any_snippet_generated" >> $GITHUB_OUTPUT
 
-      - name: Commit and push
+      - name: Show generated files
+        run: |
+          ls -l output/
+          cat output/*.snippet || echo "No snippet files found"
+
+      - name: Commit and push changes
         if: steps.download-and-convert.outputs.has_snippet == 'true'
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add output/*.snippet
-          git commit -m "Weekly update: sync ACL rules for QuantumultX"
-          git push
+
+          # 只有有变更时才commit
+          if ! git diff --cached --quiet; then
+            git commit -m "Weekly update: sync ACL rules for QuantumultX"
+            git push
+          else
+            echo "No changes to commit."
+          fi
