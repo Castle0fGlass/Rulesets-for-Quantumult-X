@@ -1,10 +1,9 @@
 name: Update Quantumult X Rules
 
 on:
+  workflow_dispatch:
   schedule:
-    workflow_dispatch:
-    # 每周一 UTC 时间凌晨 2 点运行
-    - cron: '0 2 * * 1'
+    - cron: '0 0 * * 1' 
 
 jobs:
   update-rules:
