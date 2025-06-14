@@ -36,11 +36,13 @@ jobs:
 
           for entry in "${RULES[@]}"; do
             read -r url filename policy <<< "$entry"
-            wget -O input.yaml "$url"
+            wget -O subconverter/input/input.yaml "$url"
 
-            ./subconverter/subconverter -g -i input.yaml -o qx_output.conf -f quantumult
+            ./subconverter/subconverter -g -i input/input.yaml -o output/qx_output.conf -f quantumult
 
-            sed "/^HOST\|DOMAIN/s/,.*,/,${policy,,}/" qx_output.conf > output/$filename
+            if [ -f output/qx_output.conf ]; then
+              sed "/^HOST\|DOMAIN/s/,.*,/,${policy,,}/" output/qx_output.conf > output/$filename
+            fi
           done
 
       - name: Commit and push
