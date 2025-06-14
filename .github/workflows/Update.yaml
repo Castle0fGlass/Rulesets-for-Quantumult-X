@@ -1,8 +1,8 @@
 name: Update Quantumult X Rules
 
 on:
-  workflow_dispatch:
   schedule:
+    workflow_dispatch:
     # 每周一 UTC 时间凌晨 2 点运行
     - cron: '0 2 * * 1'
 
@@ -14,18 +14,38 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
-      - name: Install subconverter
+      - name: Install Subconverter
         run: |
-          npm install -g subconverter
-          echo "$(npm root -g)/.bin" >> $GITHUB_PATH
+          SUB_VERSION="v0.9.0"
+          
+          echo "Downloading subconverter version ${SUB_VERSION}..."
+          wget "https://github.com/tindy2013/subconverter/releases/download/${SUB_VERSION}/subconverter-linux-amd64.tar.gz" -O subconverter.tar.gz
+          
+          echo "Extracting subconverter..."
+          tar -xzf subconverter.tar.gz
+          
+          if [ -f "subconverter-linux-amd64/subconverter" ]; then
+            echo "Found subconverter in subfolder, moving it..."
+            mv subconverter-linux-amd64/subconverter .
+            rm -rf subconverter-linux-amd64 # 清理空文件夹
+          elif [ ! -f "subconverter" ]; then
+            echo "Error: subconverter executable not found in current directory after extraction."
+            ls -R
+            exit 1
+          fi
+
+          echo "Granting execute permission to subconverter..."
+          chmod +x subconverter
+          
+          # 将 subconverter 可执行文件移动到 PATH 中，以便在后续步骤中直接调用
+          echo "Moving subconverter to /usr/local/bin..."
+          sudo mv subconverter /usr/local/bin/
+          
+          echo "subconverter setup complete and moved to /usr/local/bin."
 
       - name: Process and update LAN.snippet
         run: |
+          # 由于 subconverter 已在 PATH 中，可以直接调用
           curl -sS "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/refs/heads/master/Clash/Providers/LocalAreaNetwork.yaml" | subconverter -t quantumultx -n DIRECT > LAN.snippet
 
       - name: Process and update BlockAdAlliance.snippet
