@@ -1,8 +1,9 @@
 name: Sync ACL4SSR Rules for Quantumult X # 工作流名称
 
 on:
+  workflow_dispatch:
   schedule:
-    - cron: '0 0 * * 1' # 每周一00:00 UTC执行，请注意GitHub Actions的cron时间是UTC时间
+    - cron: '0 0 * * 1' # 每周一00:00 UTC执行
 
 jobs:
   sync-rules:
