@@ -1,0 +1,60 @@
+name: Update Quantumult X Rules
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 每周一 UTC 时间凌晨 2 点运行
+    - cron: '0 2 * * 1'
+
+jobs:
+  update-rules:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install subconverter
+        run: |
+          npm install -g subconverter
+
+      - name: Process and update LAN.snippet
+        run: |
+          curl -sS "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/refs/heads/master/Clash/Providers/LocalAreaNetwork.yaml" | subconverter -t quantumultx -n DIRECT > LAN.snippet
+
+      - name: Process and update BlockAdAlliance.snippet
+        run: |
+          curl -sS "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/refs/heads/master/Clash/Providers/BanAD.yaml" | subconverter -t quantumultx -n REJECT > BlockAdAlliance.snippet
+
+      - name: Process and update BlockAds.snippet
+        run: |
+          curl -sS "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/refs/heads/master/Clash/Providers/BanProgramAD.yaml" | subconverter -t quantumultx -n REJECT > BlockAds.snippet
+
+      - name: Process and update ChinaDomain.snippet
+        run: |
+          curl -sS "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/refs/heads/master/Clash/Providers/ChinaDomain.yaml" | subconverter -t quantumultx -n DIRECT > ChinaDomain.snippet
+
+      - name: Process and update Apple.snippet
+        run: |
+          curl -sS "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/refs/heads/master/Clash/Providers/Apple.yaml" | subconverter -t quantumultx -n DIRECT > Apple.snippet
+
+      - name: Process and update Microsoft.snippet
+        run: |
+          curl -sS "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/refs/heads/master/Clash/Providers/Ruleset/Microsoft.yaml" | subconverter -t quantumultx -n DIRECT > Microsoft.snippet
+
+      - name: Process and update ProxyLite.snippet
+        run: |
+          curl -sS "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/refs/heads/master/Clash/Providers/ProxyLite.yaml" | subconverter -t quantumultx -n PROXY > ProxyLite.snippet
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add *.snippet
+          git commit -m "自动更新 Quantumult X 规则" || echo "没有新的规则更新，跳过提交"
+          git push
