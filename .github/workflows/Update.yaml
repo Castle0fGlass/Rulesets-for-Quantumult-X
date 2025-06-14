@@ -18,8 +18,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y wget tar
           wget https://github.com/tindy2013/subconverter/releases/latest/download/subconverter_linux64.tar.gz
-          mkdir -p subconverter
-          tar -xzf subconverter_linux64.tar.gz -C subconverter
+          tar -xzf subconverter_linux64.tar.gz
           chmod +x subconverter/subconverter
 
       - name: Download and convert rules
