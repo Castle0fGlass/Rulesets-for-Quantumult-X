@@ -63,6 +63,8 @@ jobs:
               s/^DOMAIN-SUFFIX,/HOST-SUFFIX,/g;
               s/^HOST,/HOST-SUFFIX,/g;
               s/^IP-CIDR6,/IP6-CIDR,/g;
+              s/^DOMAIN,/HOST,/g;
+              s/^DOMAIN-KEYWORD,/HOST-KEYWORD,/g;
 
               # 为IP-CIDR和IP6-CIDR规则添加策略和',no-resolve'
               # 匹配规则类型和内容，然后追加正确的后缀。使用捕获组(\1)和(.*)确保精确替换
