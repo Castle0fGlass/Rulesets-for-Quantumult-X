@@ -42,7 +42,7 @@ jobs:
             # 使用curl下载文件，然后通过grep和sed进行格式转换
             curl -s "$url" | \
             # 使用grep过滤出有效的规则行（以'- '开头，并包含常见的规则类型）
-            grep -E '^\s*-\s*(DOMAIN-SUFFIX|HOST|IP-CIDR|IP6-CIDR|GEOIP|PROCESS|RULE-SET|FINAL)' | \
+            grep -E '^\s*-\s*(DOMAIN-SUFFIX|DOMAIN|DOMAIN-KEYWORD|HOST|IP-CIDR|IP6-CIDR|GEOIP|PROCESS|RULE-SET|FINAL)' | \
             sed -E "
               s/^\s*-\s*//; # 移除行首的YAML列表标记 '- '
               s/acl4.ssr//g; # 删除所有 'acl4.ssr' 标记
