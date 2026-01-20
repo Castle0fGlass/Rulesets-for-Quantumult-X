@@ -61,7 +61,6 @@ jobs:
 
               # 将Clash的DOMAIN-SUFFIX和HOST类型转换为Quantumult X的HOST-SUFFIX类型
               s/^DOMAIN-SUFFIX,/HOST-SUFFIX,/g;
-              # s/^HOST,/HOST-SUFFIX,/g;
               s/^IP-CIDR6,/IP6-CIDR,/g;
               s/^DOMAIN,/HOST,/g;
               s/^DOMAIN-KEYWORD,/HOST-KEYWORD,/g;
@@ -72,7 +71,7 @@ jobs:
 
               # 为其他通用规则类型（HOST-SUFFIX, GEOIP, PROCESS, RULE-SET, FINAL）添加策略
               # 匹配规则类型和内容，然后追加正确的策略。此规则应在IP-CIDR处理之后
-              s/^(HOST-SUFFIX|GEOIP|PROCESS|RULE-SET|FINAL)(.*)$/\1\2,${policy}/;
+              s/^(HOST|HOST-KEYWORD|HOST-SUFFIX|GEOIP|PROCESS|RULE-SET|FINAL)(.*)$/\1\2,${policy}/;
             " > "$filename" # 将转换后的内容保存到指定文件
             echo "已生成 $filename" # 输出生成成功信息
           done
